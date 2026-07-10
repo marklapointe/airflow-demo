@@ -135,3 +135,121 @@ The CLI for inspecting the workspace is documented at `docs/honcho.md`.
   changes the contract.
 * Whether to introduce a `pre-commit` configuration that runs
   `pytest tests/dags/` on every commit.
+
+## 8. The DAG-explorer UI reads DAGs via AST, never via import
+
+`web/extractor.py` parses every `*.py` under `dags/` into an `ast.Module`
+and walks it. It never executes user code, never imports `airflow.*`,
+and never invokes the DAG-bag. The reasons are the same two reasons
+Taoclty argued for static reading in TAOCP §1 (data precedes program):
+
+* **Side-effect freedom.** Importing `dags/03_orchestration/dynamic_dag_generation.py`
+  may connect to a remote API, set module-level globals, or register
+  webhooks. AST gives us the graph without those surprises.
+* **No Airflow dependency at UI time.** The reader can install only
+  Flask. The web UI exists for the same reason the unit tests do — to
+  push the heavy imports as far back as possible.
+
+Failure to capture a pattern statically (e.g. `.expand()` on
+TaskFlow, branch-returned task ids, dynamic fan-out) emits a
+**warning** on `DagMetadata.extraction_warnings`, not an exception. The
+UI renders the source link for the offending DAG so the reader can see
+what the static walker couldn't.
+
+The extractor emits two Mermaid graphs per DAG — a compact one
+(`to_mermaid_simple`, task id + operator) for index cards, and a rich
+one (`to_mermaid_rich`, icon + id + activity + subgraphs + classDef
+colours) for the per-DAG page. Both use the same `_OPERATOR_PRESETS`
+table, so icons, labels, and CSS classes stay in lockstep.
+
+## 9. 100% branch coverage on the contract modules, not the DAGs
+
+We pin coverage to **100%** on the modules that own contracts:
+
+* `include/domain/__init__.py` — typed records.
+* `include/io/__init__.py` — CSV / SQLite adapters.
+* `include/transforms/__init__.py` — pure cleaning pipeline.
+* `web/extractor.py` — static DAG metadata extractor.
+* `web/app.py` — Flask UI.
+
+DAG files (`dags/**/*.py`) are *integration-tested* via
+`tests/dags/test_dag_integrity.py` (cycle / missing-owner / dangling-
+reference checks) but are **not** unit-tested. The DAG is mostly
+composition, and the meaningful contracts already live in `include/`.
+Test energy goes to the contracts; the integration tests guard the
+composition.
+
+Enforced via `pytest --cov=web --cov=include --cov-branch` in CI. A
+green PR keeps the lines at 100/0/0 across all five modules above.
+
+## 10. Dependency injection in app factories
+
+`web/app.py::create_app(repo_root, dags_dir)` accepts paths as
+parameters rather than computing them from `Path(__file__).resolve()` at
+module-import time. Tests pass fixture paths; production passes the
+project layout. The module-level constants are *defaults*, not globals:
+
+```python
+app = create_app(repo_root=fixture_repo, dags_dir=fixture_repo / "dags")
+```
+
+The pattern keeps `tests/unit/test_app.py` free of `monkeypatch`, free
+of `PYTHONPATH` shenanigans, and free of any coupling to the shape of
+the live `dags/` tree. Tests can grow sample DAGs in a tmp dir and
+assert against the rendered HTML without one real DAG needing to
+exist on disk.
+
+## 11. Real-browser fixture for SPA-shaped flows
+
+`tests/e2e/test_ui.py` uses real Chromium via Playwright because the UI
+includes Mermaid.js — a script that only executes inside a browser. A
+unit test that asserts "the HTML contains a `<pre class=mermaid>`" is
+*not enough*: Mermaid might be silently broken (CDN unreachable,
+syntax error in the graph, version mismatch).
+
+The fixture boots a real Werkzeug server in a daemon thread, shares one
+Chromium launch across the session's 11 tests, and asserts that
+Mermaid materialises an `<svg>` inside each `.mermaid` block:
+`expect(pre.locator("svg")).to_be_visible(timeout=5000)`.
+
+The e2e tests are marked `pytest.mark.e2e` and excluded from the default
+`pytest` run by the marker registration in `pyproject.toml`. CI runs
+both:
+
+* `pytest -m "not e2e"` on every PR (fast feedback).
+* `pytest -m e2e` nightly or pre-release (full Chromium spin-up).
+
+## 12. Single binary, two concerns — proxy at `/airflow/`
+
+We boot **one Flask process** that serves the static explorer natively
+*and* proxies runtime views to `airflow webserver` via `httpx`. The
+boundary is the URL prefix:
+
+* `/`, `/dag/<id>`, `/source/...`, `/system`, `/about` — handled in this
+  process. No Airflow dependency at runtime.
+* `/airflow/<path>` — proxied to `airflow_webserver_url` (default
+  `$AIRFLOW_WEBSERVER_URL`, override via `--airflow-url`).
+
+When the env var is unset, the `/airflow/*` routes aren't registered —
+`create_app(airflow_webserver_url=None)` returns an app whose index
+returns no proxy links. The static reader remains fully usable without
+Airflow installed; the runtime views surface only when the operator
+wants them.
+
+Trade-off matrix vs the alternatives:
+
+* **Plugin inside airflow webserver** — costs: requires Airflow
+  installed; static-extraction purity is harder to honour. Wins:
+  one process, one URL.
+* **Reverse proxy** (caddy / nginx / haproxy) — costs: two processes +
+  proxy config. Wins: production-grade; both processes restartable
+  independently.
+* **Single Flask process with proxy (this design)** — costs: HTTP proxy
+  adds a network hop for runtime views; some Airflow endpoints use
+  WebSockets (live logs) which this proxy does not yet forward.
+  Wins: one binary; the static reader stays fast and dependency-free.
+
+The WebSocket limitation is honest: the current proxy passes HTTP only.
+For Airflow's live-log streaming, either run airflow webserver on its
+own port and bookmark it, or extend this proxy with WebSocket forwarding
+(httpx doesn't support WS; consider `websockets` or `flask-sock`).

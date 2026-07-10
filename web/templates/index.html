@@ -10,6 +10,13 @@
     and what each task <em>does</em> (from its <code>python_callable</code> docstring).
     Click into any DAG for the full picture.
   </p>
+  {% if airflow_webserver_url %}
+  <p class="muted">
+    🛰 Runtime views (<em>logs, XCom values, runs in progress</em>) live at
+    <a href="/airflow/home">/airflow/…</a>, proxied to
+    <code>{{ airflow_webserver_url }}</code>.
+  </p>
+  {% endif %}
 </section>
 
 <section class="topics">

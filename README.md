@@ -204,6 +204,35 @@ python3 -m airflow standalone
 The webserver defaults to <http://localhost:8080>. On a fresh install, Airflow
 asks you to create the first admin user; follow the prompt.
 
+## Web UI
+
+This repo ships a Flask app that statically walks each DAG file via AST
+and renders a Mermaid graph of every task. It serves two purposes at
+once:
+
+1. **Standalone explorer.** With only Flask + httpx installed, run
+   `python main.py ui` and read every DAG in the project. There's no
+   scheduler, no metadata DB, no DAG bag. The extractor parses source
+   files; it never imports them.
+
+2. **Single-binary front for Airflow.** Pass `--airflow-url` (or set
+   `AIRFLOW_WEBSERVER_URL`) and this app also proxies `/airflow/*` to
+   the upstream `airflow webserver`, so you have one URL for both
+   "what does this DAG look like?" and "what did last Tuesday's run do?".
+
+Routes:
+
+| Route                       | Purpose                                                |
+|-----------------------------|--------------------------------------------------------|
+| `GET /`                     | Every DAG, one card per DAG with a mini Mermaid graph. |
+| `GET /dag/<dag_id>`         | Per-DAG detail: rich graph + tasks table.              |
+| `GET /source/<path>`        | Raw DAG source (text/plain, traversal-safe).           |
+| `GET /system`, `GET /about` | Architecture map and extraction explainer.             |
+| `GET /airflow/<path>`       | Proxy to Airflow webserver (when configured).          |
+
+See `web/README.md` for the full doc — what it shows, how to run, the
+security model, and how it's tested.
+
 ## Running Tests
 
 ```bash

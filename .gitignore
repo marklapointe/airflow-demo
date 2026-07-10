@@ -50,3 +50,5 @@ data/sample/checkpoints/
 
 # --- Agent / editor session state (not source) ---
 .omo/
+
+.idea/vcs.xml

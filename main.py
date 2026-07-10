@@ -10,7 +10,7 @@ Usage::
     python3 main.py list                    # list registered DAGs (uses airflow)
     python3 main.py test <dag> <task>       # equivalent to `airflow tasks test`
     python3 main.py check                   # static-check every DAG file via AST
-    python3 main.py ui [--port 5000]        # start the DAG-explorer web UI
+    python3 main.py ui [--airflow-url URL]  # start the DAG-explorer web UI (proxies /airflow/* if URL given)
 """
 from __future__ import annotations
 
@@ -93,21 +93,33 @@ def cmd_check(_: argparse.Namespace) -> int:
 
 
 def cmd_ui(args: argparse.Namespace) -> int:
-    """Start the DAG-explorer web UI."""
+    """Start the DAG-explorer web UI (and optionally proxy Airflow views)."""
     try:
         from web.app import create_app
     except ImportError as exc:
         print(
             f"Cannot import the web app: {exc}\n"
-            "Install Flask:  pip install flask",
+            "Install Flask + httpx:  pip install flask httpx",
             file=sys.stderr,
         )
         return 1
+
+    import os
+    airflow_url = args.airflow_url or os.environ.get("AIRFLOW_WEBSERVER_URL")
+
     host = args.host
     port = args.port
     print(f"🌐 Airflow DAG Explorer starting on http://{host}:{port}")
+    if airflow_url:
+        print(f"   Proxying /airflow/* -> {airflow_url}")
+    else:
+        print("   No AIRFLOW_WEBSERVER_URL set; /airflow/* routes are disabled.")
+        print("   (Start `airflow webserver` and re-run with --airflow-url=http://127.0.0.1:8080)")
     print(f"   Press Ctrl-C to stop.")
-    create_app().run(host=host, port=port, debug=args.debug, use_reloader=False)
+    create_app(
+        airflow_webserver_url=airflow_url,
+        proxy_timeout=args.proxy_timeout,
+    ).run(host=host, port=port, debug=args.debug, use_reloader=False)
     return 0
 
 
@@ -198,6 +210,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_ui = sub.add_parser("ui", help="start the DAG-explorer web UI (Flask)")
     p_ui.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1)")
     p_ui.add_argument("--port", type=int, default=5000, help="bind port (default: 5000)")
+    p_ui.add_argument(
+        "--airflow-url",
+        default=None,
+        help=(
+            "URL of the airflow webserver to proxy /airflow/* to. "
+            "Defaults to env AIRFLOW_WEBSERVER_URL."
+        ),
+    )
+    p_ui.add_argument(
+        "--proxy-timeout",
+        type=float,
+        default=5.0,
+        help="Seconds to wait on the upstream before returning 502 (default: 5.0)",
+    )
     p_ui.add_argument("--debug", action="store_true", help="enable Flask debug mode")
     p_ui.set_defaults(func=cmd_ui)
 

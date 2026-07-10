@@ -240,3 +240,137 @@ class TestRepoRootHardening:
         outside = "/tmp/__outside_blocked__/x.py"
         resp = client.get(f"/source{outside}")
         assert resp.status_code in (403, 404)
+
+
+# --- proxy to airflow webserver -------------------------------------------
+
+
+import socket
+import threading
+import time
+
+import pytest
+from werkzeug.serving import make_server
+
+from web.app import _normalise_upstream_base, _proxy_request  # noqa: E402
+
+
+class TestProxyDisabled:
+    def test_proxy_routes_absent_when_unconfigured(self, client):
+        resp = client.get("/airflow/")
+        # Werkzeug returns 404 when the route was never registered.
+        assert resp.status_code == 404
+
+    def test_proxy_path_absent_when_unconfigured(self, client):
+        resp = client.get("/airflow/dags")
+        assert resp.status_code == 404
+
+
+def _free_port() -> int:
+    """Find an unused TCP port for a transient upstream Flask."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class _Upstream:
+    """Tiny WSGI server with one route, used as a stand-in for airflow webserver."""
+
+    def __init__(self):
+        self.app = _Upstream._build_app()
+        self.port = _free_port()
+        self.srv = make_server("127.0.0.1", self.port, self.app)
+        self.thread = threading.Thread(target=self.srv.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.thread.start()
+        time.sleep(0.05)  # let the server bind
+        return self
+
+    def __exit__(self, *_):
+        self.srv.shutdown()
+        self.thread.join(timeout=5)
+
+    @staticmethod
+    def _build_app():
+        from flask import Flask, request
+        upstream_app = Flask("upstream")
+
+        @upstream_app.route("/home")
+        def home():
+            return f"<h1>Upstream says hello (path={request.path})</h1>"
+
+        @upstream_app.route("/echo/<name>")
+        def echo(name):
+            return f"echo:{name}"
+
+        @upstream_app.route("/method", methods=["GET", "POST"])
+        def method():
+            return f"method:{request.method}"
+
+        return upstream_app
+
+
+@pytest.fixture
+def proxy_client(fixture_repo: Path):
+    """A Flask test_client wired to a live upstream that lives for the test."""
+    with _Upstream() as u:
+        app = create_app(
+            repo_root=fixture_repo,
+            dags_dir=fixture_repo / "dags",
+            airflow_webserver_url=f"http://127.0.0.1:{u.port}",
+            proxy_timeout=2.0,
+        )
+        app.config.update(TESTING=True)
+        with app.test_client() as c:
+            yield c, app
+
+
+class TestProxyEnabled:
+    def test_proxy_redirects_root_to_home(self, proxy_client):
+        client, _ = proxy_client
+        resp = client.get("/airflow/")
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/airflow/home")
+
+    def test_proxy_forwards_path_to_upstream(self, proxy_client):
+        client, _ = proxy_client
+        resp = client.get("/airflow/echo/abc")
+        assert resp.status_code == 200
+        assert resp.get_data(as_text=True) == "echo:abc"
+
+    def test_proxy_strips_internal_paths(self, proxy_client):
+        client, _ = proxy_client
+        # The upstream's /home must NOT carry our ``/airflow`` prefix.
+        resp = client.get("/airflow/home")
+        assert "Upstream says hello" in resp.get_data(as_text=True)
+
+    def test_proxy_forwards_query_string(self, proxy_client):
+        client, _ = proxy_client
+        resp = client.get("/airflow/echo/abc?x=1&y=2")
+        assert resp.status_code == 200
+
+    def test_proxy_returns_502_when_upstream_unreachable(self, fixture_repo):
+        # Use a port we just freed — nothing listening.
+        dead_port = _free_port()
+        app = create_app(
+            repo_root=fixture_repo,
+            dags_dir=fixture_repo / "dags",
+            airflow_webserver_url=f"http://127.0.0.1:{dead_port}",
+            proxy_timeout=0.5,
+        )
+        client = app.test_client()
+        resp = client.get("/airflow/echo/abc")
+        assert resp.status_code == 502
+        body = resp.get_data(as_text=True)
+        assert "unreachable" in body.lower()
+
+
+class TestProxyHelpers:
+    def test_normalise_upstream_strips_trailing_path(self):
+        # ``urlsplit`` parses both ``/foo`` and ``/foo/`` correctly; we just
+        # drop the path so the request builder can re-append ``/<upath>``.
+        assert _normalise_upstream_base("http://h:1/foo") == "http://h:1"
+        assert _normalise_upstream_base("http://h:1/foo/") == "http://h:1"
+        assert _normalise_upstream_base("http://h:1/") == "http://h:1"
+        assert _normalise_upstream_base("http://h:1") == "http://h:1"

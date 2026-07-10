@@ -109,3 +109,58 @@ We aim for these in `csv_to_warehouse.py`.
   `BashOperator` / `SSHOperator` instead.
 * XCom for *data* (only for control values) — large objects go to S3,
   GCS, or the warehouse.
+
+## Test patterns
+
+These patterns apply to the web UI / test code rather than the DAGs
+themselves. They show up in `tests/unit/test_app.py`,
+`tests/unit/test_extractor.py`, and `tests/e2e/test_ui.py`.
+
+### Static analysis over import
+
+The DAG explorer at `web/` never imports a DAG. It calls
+`ast.parse(source)` and walks the resulting `ast.Module`, looking for
+`with DAG(...)` blocks and operator instantiations. Reasons:
+
+* Importing runs side effects, including scheduler registration.
+* Importing depends on the metadata DB.
+* Importing changes when DAG code changes; AST analysis changes when the
+  *contract* changes.
+
+Patterns the extractor can't capture statically (`.expand()`, branch-
+returned ids, dynamic fan-out) emit a warning on
+`extraction_warnings`, not an exception — the DAG itself still runs.
+
+### Dependency injection in app factories
+
+`create_app(repo_root, dags_dir, airflow_webserver_url)` accepts paths
+and config as parameters. Tests pass fixtures; production passes the
+project layout. No `monkeypatch`, no `PYTHONPATH` games. Tests can
+ship tiny DAGs in tmp paths and assert against rendered HTML.
+
+### Reverse-proxy the other product, don't merge
+
+`web/app.py::_register_proxy` mounts `/airflow/*` HTTP routes only
+when `airflow_webserver_url` is set. The proxy uses `httpx.request` with
+a 5-second timeout; unreachable upstreams return 502 with a plain-text
+explanation. WebSocket endpoints (Airflow live logs) are *not* yet
+forwarded and the limitation is documented in `web/README.md`.
+
+### Real-browser fixture for SPA-shaped flows
+
+`tests/e2e/test_ui.py` boots the real Flask app in a daemon thread and
+drives a real Chromium via Playwright. Asserts Mermaid actually
+materialises an `<svg>` inside each `.mermaid` block (not just that
+HTML contains the class). Marked `pytest.mark.e2e` so the default run
+stays fast.
+
+### 100% coverage on the contract modules
+
+Coverage target is 100% on `web/extractor.py`, `web/app.py`,
+`include/domain/__init__.py`, `include/io/__init__.py`, and
+`include/transforms/__init__.py`. DAG files are integration-tested
+only. Enforced via `pytest --cov=web --cov=include --cov-branch` in CI.
+
+A test that covers a branch but duplicates its setup across files is a
+smell — promote the scenario to a fixture, parameterise, and have one
+test per behaviour rather than one test per file.

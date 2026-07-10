@@ -7,6 +7,14 @@
 <header class="dag-header">
   <h1><span class="topic-pill">{{ dag.topic or "?" }}</span> {{ dag.dag_id }}</h1>
   {% if dag.description %}<p class="lede">{{ dag.description }}</p>{% endif %}
+  {% if airflow_webserver_url %}
+  <p class="muted">
+    Runtime views of this DAG:
+    <a href="/airflow/dags/{{ dag.dag_id }}/grid">grid</a>,
+    <a href="/airflow/dags/{{ dag.dag_id }}/calendar">calendar</a>,
+    <a href="/airflow/dags/{{ dag.dag_id }}/tasks">tasks</a>.
+  </p>
+  {% endif %}
   <div class="meta-row">
     <span><strong>schedule:</strong> <code>{{ dag.schedule }}</code></span>
     {% if dag.tags %}
