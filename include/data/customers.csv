@@ -1,0 +1,6 @@
+customer_id,email,signup_date,country
+1001,alice@example.com,2023-01-15,US
+1002,bob@example.com,2023-02-09,CA
+1003,carol@example.com,2023-03-22,GB
+1004,dan@example.com,2023-04-30,US
+1005,eve@example.com,2023-05-11,DE

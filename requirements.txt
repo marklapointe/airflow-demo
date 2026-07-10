@@ -1,0 +1,21 @@
+# Runtime dependencies for the learning project.
+# Apache Airflow 3.0 line is required (uses `schedule=` keyword and
+# `apache-airflow-providers-standard` package layout).
+#
+# Install the constraints file matching your Python + Airflow version to get
+# a reproducible environment. The example below is for Python 3.12 on a
+# 64-bit system; pick the right URL from
+# https://airflow.apache.org/docs/apache-airflow/stable/installation/installing-from-pypi.html
+#
+#   pip install "apache-airflow==3.0.2" \
+#       --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.0.2/constraints-3.12.txt"
+#
+# Then add the extras needed for the example DAGs in this repo:
+
+apache-airflow>=3.0,<4.0
+apache-airflow-providers-standard
+apache-airflow-providers-sqlite
+
+# --- Test/dev tooling ---
+pytest>=8.0
+pytest-timeout>=2.3

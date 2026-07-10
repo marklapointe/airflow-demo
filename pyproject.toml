@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airflow-learning"
+version = "0.1.0"
+description = "A structured Apache Airflow 3.0 learning project with concrete examples and TAOCP-grade design notes."
+requires-python = ">=3.10"
+readme = "README.md"
+
+# `dependencies` is intentionally minimal: the heavy lifting is `apache-airflow`,
+# which the user installs per the README using the official constraints file.
+# Keeping it out of pyproject.toml avoids pulling in a second resolver and
+# prevents hash drift between local dev and the constraints-pinned environment.
+dependencies = [
+    "apache-airflow>=3.0,<4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.3",
+]
+
+[tool.setuptools]
+# We are not packaging the DAGs, plugins, or `include/` modules for
+# distribution - this project is a learning workspace, not a library.
+# Empty packages list keeps `pip install -e .` happy without dragging
+# the whole tree into site-packages.
+packages = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+filterwarnings = [
+    # Airflow emits many deprecation warnings on import; they are noise here.
+    "ignore::DeprecationWarning:airflow.*",
+]
+
+[tool.setuptools.package-data]
+"include" = ["**/*.csv", "**/*.json", "**/*.yml", "**/*.yaml"]

@@ -1,0 +1,5 @@
+product_id,sku,name,category,unit_price_cents
+5001,SKU-A,Widget,gadgets,1299
+5002,SKU-B,Gizmo,gadgets,2599
+5003,SKU-C,Doohickey,accessories,499
+5004,SKU-D,Thingamajig,accessories,899
