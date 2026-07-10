@@ -8,8 +8,9 @@ Usage::
 
     python3 main.py demo                    # run a sample task — debugger-friendly
     python3 main.py list                    # list registered DAGs (uses airflow)
-    python3 main.py test <dag_id> <task_id> # equivalent to `airflow tasks test`
+    python3 main.py test <dag> <task>       # equivalent to `airflow tasks test`
     python3 main.py check                   # static-check every DAG file via AST
+    python3 main.py ui [--port 5000]        # start the DAG-explorer web UI
 """
 from __future__ import annotations
 
@@ -89,6 +90,25 @@ def cmd_check(_: argparse.Namespace) -> int:
     print()
     print(f"checked {len(list(DAGS_DIR.rglob('*.py')))} DAG file(s); {failures} issue(s)")
     return 1 if failures else 0
+
+
+def cmd_ui(args: argparse.Namespace) -> int:
+    """Start the DAG-explorer web UI."""
+    try:
+        from web.app import create_app
+    except ImportError as exc:
+        print(
+            f"Cannot import the web app: {exc}\n"
+            "Install Flask:  pip install flask",
+            file=sys.stderr,
+        )
+        return 1
+    host = args.host
+    port = args.port
+    print(f"🌐 Airflow DAG Explorer starting on http://{host}:{port}")
+    print(f"   Press Ctrl-C to stop.")
+    create_app().run(host=host, port=port, debug=args.debug, use_reloader=False)
+    return 0
 
 
 # --- helpers ----------------------------------------------------------
@@ -174,6 +194,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_test.add_argument("task", help="task id, e.g. processing_group.extract_data")
     p_test.add_argument("date", help="execution date, e.g. 2024-01-01")
     p_test.set_defaults(func=cmd_test)
+
+    p_ui = sub.add_parser("ui", help="start the DAG-explorer web UI (Flask)")
+    p_ui.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1)")
+    p_ui.add_argument("--port", type=int, default=5000, help="bind port (default: 5000)")
+    p_ui.add_argument("--debug", action="store_true", help="enable Flask debug mode")
+    p_ui.set_defaults(func=cmd_ui)
 
     return p
 

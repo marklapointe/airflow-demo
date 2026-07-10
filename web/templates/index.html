@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}DAGs — Airflow Explorer{% endblock %}
+
+{% block content %}
+<section class="intro">
+  <h1>What this UI shows</h1>
+  <p>
+    A live view of every DAG in <code>dags/</code>, statically extracted via AST
+    analysis. Each card below shows a mini activity graph — task icons, names,
+    and what each task <em>does</em> (from its <code>python_callable</code> docstring).
+    Click into any DAG for the full picture.
+  </p>
+</section>
+
+<section class="topics">
+  {% set ns = namespace(current_topic="") %}
+  {% for d in dags %}
+    {% if d.topic != ns.current_topic %}
+      {% if not loop.first %}</div>{% endif %}
+      {% set ns.current_topic = d.topic %}
+      <h2 class="topic-header">{{ d.topic or "Other" }}</h2>
+      <div class="card-grid">
+    {% endif %}
+    <a class="card" href="{{ url_for('dag_detail', dag_id=d.dag_id) }}">
+      <div class="card-header">
+        <span class="dag-id">{{ d.dag_id }}</span>
+        <span class="schedule">{{ d.schedule }}</span>
+      </div>
+      {% if d.description %}<p class="desc">{{ d.description }}</p>{% endif %}
+      <div class="mini-graph">
+        <pre class="mermaid">{{ d.to_mermaid_simple() }}</pre>
+      </div>
+      <div class="card-meta">
+        <span>📋 {{ d.tasks|length }} tasks</span>
+        <span>🔗 {{ d.edges|length }} edges</span>
+        {% if d.tags %}
+          {% for t in d.tags[:3] %}<span class="tag">{{ t }}</span>{% endfor %}
+        {% endif %}
+      </div>
+    </a>
+    {% if loop.last %}</div>{% endif %}
+  {% endfor %}
+</section>
+{% endblock %}

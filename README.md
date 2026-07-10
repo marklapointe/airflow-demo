@@ -207,13 +207,26 @@ asks you to create the first admin user; follow the prompt.
 ## Running Tests
 
 ```bash
-# Unit tests: ms-fast; covers include/ package only.
-python3 -m pytest tests/unit/ -v
+# Unit tests: ms-fast; 100% coverage on web/ and include/.
+python3 -m pytest tests/unit/ -v --cov=web --cov=include --cov-branch
 
 # DAG integrity tests: parse every DAG file in dags/, fail on missing
 # owners, dangling tasks, cycles, and undefined references.
 python3 -m pytest tests/dags/
+
+# End-to-end browser tests via Playwright (need Chromium installed once):
+python3 -m playwright install chromium
+python3 -m pytest tests/e2e/ -v
 ```
+
+The unit-test suite enforces 100% branch coverage on `web/extractor.py`,
+`web/app.py`, `include/io/__init__.py`, `include/domain/__init__.py`,
+and `include/transforms/__init__.py` — these are the modules that own
+contracts. DAG files are integration-tested only.
+
+The e2e suite boots the real Flask app in a thread and drives a real
+Chromium browser, so Mermaid actually renders to SVG (not just emits
+HTML containing a `mermaid` class).
 
 ## Honcho and design notes
 

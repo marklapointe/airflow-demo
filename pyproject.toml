@@ -21,6 +21,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-timeout>=2.3",
+    "flask>=3.0",
+    "pytest-cov>=5.0",
+    "pytest-playwright>=0.5",
 ]
 
 [tool.setuptools]
@@ -33,6 +36,9 @@ packages = []
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "e2e: end-to-end browser tests (require Chromium; skip in fast CI runs)",
+]
 filterwarnings = [
     # Airflow emits many deprecation warnings on import; they are noise here.
     "ignore::DeprecationWarning:airflow.*",

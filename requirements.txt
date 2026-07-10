@@ -19,3 +19,6 @@ apache-airflow-providers-sqlite
 # --- Test/dev tooling ---
 pytest>=8.0
 pytest-timeout>=2.3
+flask>=3.0
+pytest-cov>=5.0
+pytest-playwright>=0.5

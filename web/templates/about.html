@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}About — Airflow Explorer{% endblock %}
+
+{% block content %}
+<a class="back" href="{{ url_for('index') }}">← All DAGs</a>
+
+<h1>About this UI</h1>
+
+<h2>What it is</h2>
+<p>
+  A lightweight, project-specific web UI that reads the DAG files via AST
+  (Abstract Syntax Tree) analysis and renders each one's task graph with
+  what each task <em>does</em>. Built because the Airflow webserver shows
+  runtime state, but for a learning project the <em>structure</em> of each
+  DAG is the more useful view.
+</p>
+
+<h2>How extraction works</h2>
+<ol>
+  <li>For each <code>*.py</code> file under <code>dags/</code>, the extractor
+    parses the source as Python AST (no execution).</li>
+  <li>It locates the top-level <code>with DAG(...)</code> block and pulls out
+    <code>dag_id</code>, <code>schedule</code>, <code>description</code>, and
+    <code>tags</code>.</li>
+  <li>It walks the DAG body, finding operator instantiations
+    (<code>PythonOperator(...)</code>, <code>BashOperator(...)</code>, etc.) and
+    TaskFlow <code>@task</code> calls. Each operator becomes a <em>node</em> in
+    the graph.</li>
+  <li>For each <code>PythonOperator</code>, it resolves the
+    <code>python_callable</code> name to the function's docstring, giving every
+    node a one-line <em>activity</em> description.</li>
+  <li>It collects <code>TaskGroup</code> contexts and renders them as subgraphs.</li>
+  <li>It walks <code>&gt;&gt;</code> chains (and lists inside them), flattening
+    left-associative <code>a &gt;&gt; b &gt;&gt; c</code> into edges.</li>
+  <li>The collected metadata becomes a Mermaid <code>graph TD</code> string,
+    color-coded by operator type.</li>
+</ol>
+
+<h2>Why this approach</h2>
+<ul>
+  <li><strong>No side effects.</strong> Importing a DAG would trigger Airflow's
+    DAG-bag registration. AST is pure.</li>
+  <li><strong>No Airflow dependency at UI time.</strong> A learner can install
+    only Flask and explore the project before ever running <code>airflow db
+    migrate</code>.</li>
+  <li><strong>Best-effort.</strong> Patterns the extractor can't capture
+    statically (TaskFlow <code>.expand()</code>, branch-returned task ids,
+    dynamic fan-out) generate a warning rather than failing. The DAG itself
+    still works at runtime.</li>
+</ul>
+
+<h2>Run it</h2>
+<pre><code>pip install flask
+python main.py ui
+# open http://localhost:5000</code></pre>
+
+<p>
+  Mermaid.js is loaded from a CDN. The UI itself is just Jinja templates — no
+  build step.
+</p>
+{% endblock %}

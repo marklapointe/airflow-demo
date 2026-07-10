@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}System map — Airflow Explorer{% endblock %}
+
+{% block content %}
+<a class="back" href="{{ url_for('index') }}">← All DAGs</a>
+
+<h1>System map</h1>
+<p>
+  How the project is wired: DAGs read from <code>include/</code>; <code>include/io</code>
+  and <code>include/transforms</code> are pure-Python (no Airflow import); tests run
+  in milliseconds without the scheduler; <code>web/</code> reads DAGs statically.
+</p>
+
+<div class="graph-large">
+  <pre class="mermaid">
+graph LR
+  subgraph Users
+    dev[Learner]
+  end
+
+  subgraph Project
+    dags["dags/<br/>01_basics / 02_etl / 03_orchestration<br/>04_resilience / 05_advanced"]
+    include["include/<br/>domain · io · transforms · data/"]
+    tests["tests/<br/>unit + DAG integrity"]
+    web["web/<br/>DAG explorer UI"]
+    main["main.py<br/>CLI helper"]
+  end
+
+  subgraph Runtime["Airflow (when installed)"]
+    sched[Scheduler]
+    webserver[Webserver]
+    meta[(Metadata DB)]
+  end
+
+  dev -->|"python main.py ui"| web
+  dev -->|"pytest tests/unit/"| tests
+  dev -->|"airflow db migrate + dags list"| sched
+
+  dags -->|"import"| include
+  dags -->|"schedule on"| sched
+  include -->|"CsvSource / SqliteSink"| include
+  tests -->|"asserts"| include
+  tests -->|"AST scans"| dags
+  web -->|"AST extracts"| dags
+  web -->|"renders Mermaid"| dev
+  main -->|"ui / check / demo"| dev
+
+  sched --> meta
+  webserver --> meta
+  webserver -->|"visualises"| dev
+  </pre>
+</div>
+
+<h2>Key design decisions</h2>
+<ul>
+  <li><strong>Hexagonal boundary:</strong> <code>include/</code> never imports Airflow.
+    DAGs are orchestration only.</li>
+  <li><strong>Streaming &gt; lists:</strong> <code>CsvSource</code> returns iterators.
+    Bounded memory regardless of input size.</li>
+  <li><strong>Idempotency at the sink:</strong> every <code>SqliteSink.write()</code>
+    uses <code>INSERT OR IGNORE</code> on a natural key, so retries are safe.</li>
+  <li><strong>Static analysis for the UI:</strong> the web app reads DAG files via
+    AST. It works without Airflow installed and never side-effects the DAG bag.</li>
+  <li><strong>TAOCP-style records:</strong> every record is a <code>frozen=True,
+    slots=True, kw_only=True</code> dataclass with explicit <code>NewType</code>
+    ids.</li>
+</ul>
+
+<p>Full reasoning: <a href="docs/design_decisions.md">docs/design_decisions.md</a>,
+<a href="docs/patterns.md">docs/patterns.md</a>, <a href="docs/taocp_applications.md">docs/taocp_applications.md</a>.</p>
+{% endblock %}

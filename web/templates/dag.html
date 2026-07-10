@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ dag.dag_id }} — Airflow Explorer{% endblock %}
+
+{% block content %}
+<a class="back" href="{{ url_for('index') }}">← All DAGs</a>
+
+<header class="dag-header">
+  <h1><span class="topic-pill">{{ dag.topic or "?" }}</span> {{ dag.dag_id }}</h1>
+  {% if dag.description %}<p class="lede">{{ dag.description }}</p>{% endif %}
+  <div class="meta-row">
+    <span><strong>schedule:</strong> <code>{{ dag.schedule }}</code></span>
+    {% if dag.tags %}
+      <span><strong>tags:</strong> {% for t in dag.tags %}<span class="tag">{{ t }}</span>{% endfor %}</span>
+    {% endif %}
+    <span><strong>source:</strong> <code>{{ dag.relative_path }}</code></span>
+  </div>
+</header>
+
+{% if dag.module_docstring %}
+<section class="card">
+  <h2>What this DAG does</h2>
+  <pre class="docstring">{{ dag.module_docstring }}</pre>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Activity graph</h2>
+  <p class="muted">
+    Each node shows an icon (operator type), task name, and a one-line description of
+    what the task does. Subgraphs are <code>TaskGroup</code>s. Hover and zoom in Mermaid.
+  </p>
+  <div class="graph-large">
+    <pre class="mermaid" id="rich-graph">{{ dag.to_mermaid_rich() }}</pre>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Tasks ({{ dag.tasks|length }})</h2>
+  <table class="tasks-table">
+    <thead>
+      <tr>
+        <th>task_id</th>
+        <th>operator</th>
+        <th>group</th>
+        <th>activity</th>
+        <th>line</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in dag.tasks %}
+        <tr>
+          <td><code>{{ t.task_id }}</code></td>
+          <td><span class="op op-{{ t.operator | replace('Operator','') | lower }}">{{ t.operator }}</span></td>
+          <td>{{ t.group or "—" }}</td>
+          <td>
+            {% set act = t.activity.splitlines()[0] if t.activity else '' %}
+            {% if act %}<span class="activity">{{ act }}</span>{% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td><a href="{{ url_for('source', relative_path=dag.relative_path) }}#L{{ t.line }}">{{ t.line }}</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if dag.edges %}
+<section class="card">
+  <h2>Dependencies ({{ dag.edges|length }})</h2>
+  <table class="edges-table">
+    <thead><tr><th>from</th><th>→</th><th>to</th></tr></thead>
+    <tbody>
+      {% for e in dag.edges %}
+        <tr><td><code>{{ e.source }}</code></td><td>→</td><td><code>{{ e.target }}</code></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if dag.extraction_warnings %}
+<section class="card warnings">
+  <h2>⚠️ Extraction notes</h2>
+  <ul>
+    {% for w in dag.extraction_warnings %}<li>{{ w }}</li>{% endfor %}
+  </ul>
+  <p class="muted">
+    These are best-effort warnings from the static extractor. They don't mean the
+    DAG is wrong — they mean some pattern (e.g. dynamic fan-out, branch-returned
+    task ids) wasn't fully captured statically.
+  </p>
+</section>
+{% endif %}
+{% endblock %}

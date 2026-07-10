@@ -81,12 +81,22 @@ constant memory streaming patterns keep RAM bounded. Document the choice
 in code so anyone scaling up has a starting point: see
 `include/transforms/__init__.py`'s "Streams > lists" note.
 
-### We don't chase "100% test coverage"
+### We chase 100% coverage on the hot paths, not the DAGs
 
-The DAG files themselves are not unit-tested beyond the `tests/dags/`
-integrity suite. We *could* add per-DAG tests, but the DAG is mostly
-composition, and the meaningful contracts live in `include/`. Test
-energy goes there.
+We pin coverage to **100%** on the modules that own contracts:
+
+* `include/domain/__init__.py` — typed records
+* `include/io/__init__.py` — CSV / SQLite adapters
+* `include/transforms/__init__.py` — pure cleaning pipeline
+* `web/extractor.py` — static DAG metadata extractor
+* `web/app.py` — Flask UI
+
+DAG files themselves are integration-tested only — they're mostly
+composition and the meaningful contracts live in `include/`. Test
+energy goes there. The web UI is also covered by **Playwright**
+end-to-end browser tests (`tests/e2e/`) that assert Mermaid actually
+renders SVG in real Chromium, not just that the HTML contains a
+`mermaid` class.
 
 ### We don't formalise the algebra
 
