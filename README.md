@@ -2,8 +2,71 @@
 
 A structured, end-to-end learning project for **Apache Airflow 3.0**. The
 repository progresses from "what is a DAG?" to "production-shaped pipelines"
-through ten focused example DAGs, a small but real domain model, and a unit
-test suite that locks the contracts in place.
+through twelve focused example DAGs, a small but real domain model, and a
+unit test suite that locks the contracts in place.
+
+## What is Apache Airflow?
+
+Apache Airflow is an open-source platform for **programmatically authoring,
+scheduling, and monitoring workflows**. A workflow is expressed as a
+**DAG** (Directed Acyclic Graph) — a Python script where each node is a
+**task** that does one thing (run a SQL query, copy a file, call an API,
+train a model) and each edge is a dependency between tasks. Airflow reads
+those scripts, schedules the tasks to run on workers, and tracks every run
+in a metadata database so you can ask, days later, "did last Tuesday's job
+finish, and what did it actually do?".
+
+### What it replaces
+
+In practice, Airflow is the modern answer to three problems every data
+team eventually outgrows:
+
+1. **Cron jobs.** `crontab` fires commands at fixed times, but has no
+   notion of inter-task dependencies, no retry semantics, no observability,
+   no history beyond `mail`, and no clean way to backfill historical
+   runs. A wall of cron entries is fragile; a DAG is testable, version-
+   controlled, and self-documenting.
+2. **Hand-rolled workflow scripts.** The "run this Python file, then email
+   me if it fails" pattern breaks down at retries, parallelism, alerting,
+   and ten downstream jobs depending on its output. Airflow gives you
+   those for free, plus a UI to see what ran and why.
+3. **Proprietary schedulers.** When teams outgrow cron, the next step is
+   usually to buy something (Control-M, Autosys). For most workloads,
+   Airflow is good enough and free.
+
+### What it accomplishes
+
+Concretely, Airflow gives you:
+
+* **DAGs as code.** Your workflows are Python, so they go through code
+  review, CI, and `git log`. There is no separate "designer" tool to keep
+  in sync.
+* **Rich scheduling.** Cron-style (`@daily`, `@hourly`), calendar-based,
+  conditional branches, and **Dataset-driven** triggers (run a DAG when
+  its upstream data is ready, not on a clock).
+* **Dependencies, automatic.** `task_a >> task_b` declares the dependency;
+  Airflow figures out the order, the parallelism, and the failure paths.
+* **Retries with backoff and jitter.** Transient failures don't need a
+  human.
+* **A web UI.** Every run, every task, every log line is one click away.
+* **A rich operator and hook ecosystem.** `PythonOperator`, `BashOperator`,
+  `SnowflakeOperator`, `S3Hook`, `SqliteHook`… hundreds of integrations
+  are maintained as separate *provider* packages.
+* **Backfills.** Re-run a window of historical runs against new logic
+  without breaking anything.
+
+### What it does *not* do
+
+* It is **not** a streaming platform — for low-latency pipelines, look at
+  Flink, Spark Structured Streaming, or materialised views.
+* It is **not** a data warehouse — Airflow moves and transforms data; it
+  doesn't store it (use Snowflake, BigQuery, Postgres, DuckDB).
+* It is **not** a task queue — for unbounded fan-out of independent units
+  of work, look at Celery, RQ, or Temporal.
+
+If your workload fits the shape "runs every minute to every day, in
+batches, with dependencies", Airflow is the right tool. This repository
+walks you through how to use it well.
 
 ```
 airflow/
