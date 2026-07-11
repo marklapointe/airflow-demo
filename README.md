@@ -220,6 +220,15 @@ once:
    the upstream `airflow webserver`, so you have one URL for both
    "what does this DAG look like?" and "what did last Tuesday's run do?".
 
+```bash
+# Default port is 5050 — 5000 is taken by macOS Control Center, 8080 is
+# taken by countless other apps. Pass any free port. The CLI will tell you
+# if your pick is busy; use --find-port to auto-pick a free one.
+python main.py ui                                       # static only
+python main.py ui --airflow-url http://127.0.0.1:8080  # + airflow proxy
+python main.py ui --port 8080 --find-port              # busy port → auto-pick
+```
+
 Routes:
 
 | Route                       | Purpose                                                |

@@ -208,4 +208,4 @@ def _proxy_request(base: str, upath: str, timeout: float) -> Response:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    create_app().run(debug=True, port=5000)
+    create_app().run(debug=True, port=5050)

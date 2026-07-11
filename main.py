@@ -10,7 +10,8 @@ Usage::
     python3 main.py list                    # list registered DAGs (uses airflow)
     python3 main.py test <dag> <task>       # equivalent to `airflow tasks test`
     python3 main.py check                   # static-check every DAG file via AST
-    python3 main.py ui [--airflow-url URL]  # start the DAG-explorer web UI (proxies /airflow/* if URL given)
+    python3 main.py ui [--find-port]        # start the DAG-explorer web UI (default port 5050)
+    python3 main.py ui --airflow-url URL    # also proxy /airflow/* to the airflow webserver
 """
 from __future__ import annotations
 
@@ -96,6 +97,7 @@ def cmd_ui(args: argparse.Namespace) -> int:
     """Start the DAG-explorer web UI (and optionally proxy Airflow views)."""
     try:
         from web.app import create_app
+        from web.ports import find_free_port
     except ImportError as exc:
         print(
             f"Cannot import the web app: {exc}\n"
@@ -109,18 +111,53 @@ def cmd_ui(args: argparse.Namespace) -> int:
 
     host = args.host
     port = args.port
+    if args.find_port and not _port_is_free(host, port):
+        new_port = find_free_port(start=max(port, 5050))
+        print(
+            f"⚠  Port {port} is in use; auto-picked free port {new_port}.",
+            file=sys.stderr,
+        )
+        port = new_port
+    elif not _port_is_free(host, port):
+        print(
+            f"❌ Port {port} is in use. Re-run with --find-port to auto-pick, "
+            f"or pass --port=<free>.",
+            file=sys.stderr,
+        )
+        return 1
+
     print(f"🌐 Airflow DAG Explorer starting on http://{host}:{port}")
     if airflow_url:
         print(f"   Proxying /airflow/* -> {airflow_url}")
     else:
-        print("   No AIRFLOW_WEBSERVER_URL set; /airflow/* routes are disabled.")
-        print("   (Start `airflow webserver` and re-run with --airflow-url=http://127.0.0.1:8080)")
+        print(
+            "   No --airflow-url given; /airflow/* routes are disabled.\n"
+            "   To enable: start `airflow webserver` (any free port) and re-run with "
+            "--airflow-url=http://127.0.0.1:<its-port>.\n"
+            "   Port 8080 is the airflow default but it's commonly taken by other "
+            "services — pick something else if needed."
+        )
     print(f"   Press Ctrl-C to stop.")
     create_app(
         airflow_webserver_url=airflow_url,
         proxy_timeout=args.proxy_timeout,
     ).run(host=host, port=port, debug=args.debug, use_reloader=False)
     return 0
+
+
+def _port_is_free(host: str, port: int) -> bool:
+    """True iff we can bind ``(host, port)`` right now.
+
+    Deliberately omits ``SO_REUSEADDR`` so a busy port reports busy —
+    see ``web/ports.py`` for the rationale.
+    """
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+        except OSError:
+            return False
+        return True
 
 
 # --- helpers ----------------------------------------------------------
@@ -209,13 +246,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_ui = sub.add_parser("ui", help="start the DAG-explorer web UI (Flask)")
     p_ui.add_argument("--host", default="127.0.0.1", help="bind host (default: 127.0.0.1)")
-    p_ui.add_argument("--port", type=int, default=5000, help="bind port (default: 5000)")
+    p_ui.add_argument(
+        "--port",
+        type=int,
+        default=5050,
+        help=(
+            "bind port (default: 5050; 5000 is taken by macOS Control Center)"
+        ),
+    )
+    p_ui.add_argument(
+        "--find-port",
+        action="store_true",
+        help="if --port is busy, auto-pick the next free port instead of erroring",
+    )
     p_ui.add_argument(
         "--airflow-url",
         default=None,
         help=(
             "URL of the airflow webserver to proxy /airflow/* to. "
-            "Defaults to env AIRFLOW_WEBSERVER_URL."
+            "Defaults to env AIRFLOW_WEBSERVER_URL. "
+            "Pass any free port — 8080 is the airflow default but commonly taken."
         ),
     )
     p_ui.add_argument(

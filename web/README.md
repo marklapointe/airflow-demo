@@ -45,19 +45,34 @@ return 404 — the static reader remains fully usable without Airflow.
 pip install flask httpx
 
 # Static explorer only — no Airflow needed.
-python main.py ui --port 5000
+python main.py ui            # default port 5050 (5000 is taken by macOS Control Center)
 
-# Static + runtime proxy. Start `airflow webserver` first (port 8080 by default),
+# Static + runtime proxy. Start `airflow webserver` first (any free port),
 # then point this process at it.
 python main.py ui --airflow-url=http://127.0.0.1:8080
 
 # Or set the env var and skip the flag.
 AIRFLOW_WEBSERVER_URL=http://127.0.0.1:8080 python main.py ui
+
+# Port already in use? Auto-pick the next free one.
+python main.py ui --port 8080 --find-port
 ```
 
 The CLI sub-command is at `main.py::cmd_ui`. It uses Flask's built-in
 server (Werkzeug), which is fine for development. For production we'd
 swap in gunicorn or uvicorn+ASGI.
+
+### Port notes
+
+* **Port 5000** is taken by macOS Control Center. Don't use it.
+* **Port 8080** is the airflow default but is also taken by lots of
+  other things (Jupyter, Synology, MacPython apps). Pass any free port.
+* The CLI prints the resolved port and exits cleanly with a friendly
+  message if the requested one is busy; `--find-port` makes it
+  auto-pick instead.
+* `web/ports.py::find_free_port()` is the helper; it strictly checks
+  port availability (no `SO_REUSEADDR` shortcut) so the probe matches
+  what `bind()` will see at runtime.
 
 ## How extraction works
 
