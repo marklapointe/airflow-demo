@@ -283,15 +283,26 @@ across runs. Use the Honcho CLI skill to inspect the recorded conclusions:
 The `docs/design_decisions.md` file mirrors the Honcho peer card for the
 architect peer. If you change an architectural decision, update both.
 
-## Debugging in PyCharm
+## Debugging in an IDE
 
-The PyCharm run configurations from the original project still work; they
-point at `dags/01_basics/airflow_demo.py` and an `airflow standalone`
-configuration. Add new configurations for any DAG you'd like to step through.
+PyCharm and VSCode both ship with curated run/debug configurations for
+this project. They live in `.idea/runConfigurations/` and
+`.vscode/launch.json` respectively.
+
+| Configuration | What it does |
+|---|---|
+| `DAG Explorer UI` | `python main.py ui --port 7123` |
+| `DAG Explorer UI + Airflow Proxy` | Same, with `AIRFLOW_WEBSERVER_URL=http://127.0.0.1:7161` set |
+| `Airflow Webserver (port 7161)` | `python -m airflow webserver --port 7161` |
+| `Test Demo DAG Task` | `airflow tasks test csv_to_warehouse extract.extract_orders 2024-06-01` |
+| `DAG Static Check` | `python main.py check` (AST-only, no Airflow runtime) |
+| `pytest: unit + DAGs (fast)` | `pytest -m "not e2e" --cov=web --cov=include --cov-branch` |
+| `pytest: e2e (browser)` | `pytest -m e2e -v` |
+
+For running a one-off task against a different DAG:
 
 ```bash
-# Equivalent of the PyCharm "Test Demo DAG" but on the command line:
-python3 -m airflow tasks test airflow_features_demo processing_group.extract_data 2024-01-01
+python3 -m airflow tasks test csv_to_warehouse extract.extract_orders 2024-06-01
 ```
 
 ## The `main.py` entry point
