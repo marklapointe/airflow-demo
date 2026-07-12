@@ -201,10 +201,10 @@ python3 -m airflow dags trigger csv_to_warehouse
 python3 -m airflow standalone
 ```
 
-The webserver defaults to <http://localhost:8080>. 8080 is taken by lots of
-other services, so passing `--port 7161` (or another free port) is
-typical. On a fresh install, Airflow
-asks you to create the first admin user; follow the prompt.
+The Airflow webserver defaults to <http://localhost:8080>. Port 8080 is taken
+by lots of other services, so passing `--port 7161` (or another free port)
+is typical. On a fresh install, Airflow asks you to create the first admin
+user; follow the prompt.
 
 ## Web UI
 
