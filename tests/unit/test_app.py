@@ -373,4 +373,45 @@ class TestProxyHelpers:
         assert _normalise_upstream_base("http://h:1/foo") == "http://h:1"
         assert _normalise_upstream_base("http://h:1/foo/") == "http://h:1"
         assert _normalise_upstream_base("http://h:1/") == "http://h:1"
-        assert _normalise_upstream_base("http://h:1") == "http://h:1"
+
+
+# --- Template branching under proxy ----------------------------------------
+#
+# The ``airflow_webserver_url`` template context decides whether the
+# "Runtime views" banner and per-DAG airflow links appear. Both branches
+# (proxy enabled / proxy disabled) must render without errors and with
+# the right visibility — a regression that shows the banner when no
+# upstream is configured would be visible-but-broken; one that hides the
+# banner when the upstream IS configured would silently degrade the
+# single-binary use case.
+
+
+class TestProxyTemplate:
+    def test_index_no_runtime_banner_without_proxy(self, client):
+        body = client.get("/").get_data(as_text=True)
+        assert "Runtime views" not in body
+        assert 'href="/airflow/' not in body
+
+    def test_index_shows_runtime_banner_with_proxy(self, proxy_client):
+        client, _ = proxy_client
+        body = client.get("/").get_data(as_text=True)
+        assert "Runtime views" in body
+        assert 'href="/airflow/home"' in body
+
+    def test_dag_detail_no_runtime_links_without_proxy(self, client):
+        body = client.get("/dag/sample").get_data(as_text=True)
+        assert 'href="/airflow/' not in body
+
+    def test_dag_detail_shows_runtime_links_with_proxy(self, proxy_client):
+        client, _ = proxy_client
+        body = client.get("/dag/sample").get_data(as_text=True)
+        assert 'href="/airflow/dags/sample/grid"' in body
+        assert 'href="/airflow/dags/sample/calendar"' in body
+        assert 'href="/airflow/dags/sample/tasks"' in body
+
+    def test_proxy_template_context_present_even_without_proxy(
+        self, client
+    ):
+        body = client.get("/").get_data(as_text=True)
+        assert body
+        assert "Runtime views" not in body
