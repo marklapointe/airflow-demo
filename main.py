@@ -10,7 +10,7 @@ Usage::
     python3 main.py list                    # list registered DAGs (uses airflow)
     python3 main.py test <dag> <task>       # equivalent to `airflow tasks test`
     python3 main.py check                   # static-check every DAG file via AST
-    python3 main.py ui [--find-port]        # start the DAG-explorer web UI (default port 5050)
+    python3 main.py ui                       # start the DAG-explorer web UI (default port 7123)
     python3 main.py ui --airflow-url URL    # also proxy /airflow/* to the airflow webserver
 """
 from __future__ import annotations
@@ -97,7 +97,6 @@ def cmd_ui(args: argparse.Namespace) -> int:
     """Start the DAG-explorer web UI (and optionally proxy Airflow views)."""
     try:
         from web.app import create_app
-        from web.ports import find_free_port
     except ImportError as exc:
         print(
             f"Cannot import the web app: {exc}\n"
@@ -111,17 +110,14 @@ def cmd_ui(args: argparse.Namespace) -> int:
 
     host = args.host
     port = args.port
-    if args.find_port and not _port_is_free(host, port):
-        new_port = find_free_port(start=max(port, 5050))
+    if not _port_is_free(host, port):
         print(
-            f"⚠  Port {port} is in use; auto-picked free port {new_port}.",
-            file=sys.stderr,
-        )
-        port = new_port
-    elif not _port_is_free(host, port):
-        print(
-            f"❌ Port {port} is in use. Re-run with --find-port to auto-pick, "
-            f"or pass --port=<free>.",
+            f"❌ Port {port} is in use on {host}.\n"
+            f"   Re-run with --port=<free>. Solid picks (verified free on dev system):\n"
+            f"     7123  (our default)\n"
+            f"     7161  (recommended for airflow webserver)\n"
+            f"     5050 / 5555 / 7777 / 8000 / 8500 / 9000  (verified free on dev system)\n"
+            f"   Avoid 5000 (macOS Control Center), 7000, 8080 (Jupyter / Synology / lots), 8888 (Jupyter).",
             file=sys.stderr,
         )
         return 1
@@ -132,10 +128,8 @@ def cmd_ui(args: argparse.Namespace) -> int:
     else:
         print(
             "   No --airflow-url given; /airflow/* routes are disabled.\n"
-            "   To enable: start `airflow webserver` (any free port) and re-run with "
-            "--airflow-url=http://127.0.0.1:<its-port>.\n"
-            "   Port 8080 is the airflow default but it's commonly taken by other "
-            "services — pick something else if needed."
+            "   To enable: start `airflow webserver --port 7161` and re-run with "
+            "--airflow-url=http://127.0.0.1:7161."
         )
     print(f"   Press Ctrl-C to stop.")
     create_app(
@@ -148,8 +142,7 @@ def cmd_ui(args: argparse.Namespace) -> int:
 def _port_is_free(host: str, port: int) -> bool:
     """True iff we can bind ``(host, port)`` right now.
 
-    Deliberately omits ``SO_REUSEADDR`` so a busy port reports busy —
-    see ``web/ports.py`` for the rationale.
+    No auto-discovery, no SO_REUSEADDR trick — a busy port is busy.
     """
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -249,9 +242,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_ui.add_argument(
         "--port",
         type=int,
-        default=5050,
+        default=7123,
         help=(
-            "bind port (default: 5050; 5000 is taken by macOS Control Center)"
+            "bind port (default: 7123; verified free; 5000 is taken by macOS Control Center)"
         ),
     )
     p_ui.add_argument(
@@ -265,7 +258,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "URL of the airflow webserver to proxy /airflow/* to. "
             "Defaults to env AIRFLOW_WEBSERVER_URL. "
-            "Pass any free port — 8080 is the airflow default but commonly taken."
+            "Solid pick: 7161 (verified free at design time; airflow default 8080 is taken everywhere)."
         ),
     )
     p_ui.add_argument(

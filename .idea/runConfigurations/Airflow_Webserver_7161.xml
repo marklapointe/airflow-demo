@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Test Demo DAG Task" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="Airflow Webserver (port 7161)" type="PythonConfigurationType" factoryName="Python">
     <module name="airflow" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
@@ -13,7 +13,7 @@
     <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <option name="SCRIPT_NAME" value="airflow" />
-    <option name="PARAMETERS" value="tasks test csv_to_warehouse extract.extract_orders 2024-06-01" />
+    <option name="PARAMETERS" value="webserver --port 7161" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="true" />

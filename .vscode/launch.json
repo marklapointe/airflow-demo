@@ -1,0 +1,86 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "DAG Explorer UI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["ui", "--port", "7123"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
+    },
+    {
+      "name": "DAG Explorer UI + Airflow Proxy",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["ui", "--port", "7123"],
+      "env": {
+        "AIRFLOW_WEBSERVER_URL": "http://127.0.0.1:7161"
+      },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
+    },
+    {
+      "name": "Airflow Webserver (port 7161)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "airflow",
+      "args": ["webserver", "--port", "7161"],
+      "env": {
+        "AIRFLOW_HOME": "${workspaceFolder}",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Test Demo DAG Task",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "airflow",
+      "args": ["tasks", "test", "csv_to_warehouse", "extract.extract_orders", "2024-06-01"],
+      "env": {
+        "AIRFLOW_HOME": "${workspaceFolder}",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "DAG Static Check",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["check"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
+    },
+    {
+      "name": "pytest: unit + DAGs (fast)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-m", "not e2e", "--cov=web", "--cov=include", "--cov-branch", "tests/"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "pytest: e2e (browser)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-m", "e2e", "-v", "tests/e2e/"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    }
+  ]
+}

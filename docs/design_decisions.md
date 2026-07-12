@@ -254,28 +254,23 @@ For Airflow's live-log streaming, either run airflow webserver on its
 own port and bookmark it, or extend this proxy with WebSocket forwarding
 (httpx doesn't support WS; consider `websockets` or `flask-sock`).
 
-## 13. Default ports that aren't 5000 or 8080
+## 13. Solid default ports — no auto-discovery, no moving targets
 
-Port 5000 is famously taken by macOS Control Center. Port 8080 is the
-airflow default but it's also taken by Jupyter, Synology, half the
-Python apps on the planet, and any number of internal HTTP services.
-Picking either as a default means the reader hits a confusing bind
-error on first run.
+Port 5000 is famously taken by macOS Control Center. Port 8080 — the
+airflow default — is taken by Jupyter, Synology, half the Python apps
+on the planet, and any number of internal HTTP services. Picking
+either as a default means the reader hits a confusing bind error on
+first run.
 
-* The Flask UI defaults to **port 5050** (still close to 5000 for
-  muscle memory, well clear of the conflict).
-* The CLI accepts `--port <N>` and `--find-port`. Without `--find-port`,
-  a busy port exits with a friendly message. With it, the CLI auto-
-  picks the lowest free port in `[5050, 65535]` and prints the chosen
-  number so the reader knows where to point their browser.
-* `web/ports.py::find_free_port` strictly probes via `bind()` — no
-  `SO_REUSEADDR` shortcut. The latter lets a probe succeed on a port
-  another process owns, which makes the check report "free" when it
-  isn't. Strict probe matches what `bind()` will see at runtime.
-* For the airflow webserver URL, we **don't** default a port. The CLI
-  message reminds the reader that 8080 is contested and to pick a free
-  one when starting `airflow webserver`.
+* The Flask UI defaults to **port 7123** — verified free at design time on
+  the development system (not on auto-discovery, not on the user's system).
+* For `airflow webserver` examples we recommend **7161** — same rationale
+  (verified free, not a default for anything else).
+* No `--find-port` flag, no auto-discovery, no moving targets. If the
+  port is busy the CLI exits with a clean error message and a list of
+  solid alternatives (`7123`, `7161`, `5050`, `5555`, `7777`) so the reader picks one
+  explicitly. The port you start with is the port you stay on.
 
-The rationale is documented in the test suite itself: `test_ports.py`
-verifies the strict-probe behaviour, and the proxy tests use a freshly
-allocated port so they're stable across machines.
+The CLI's busy-port error enumerates the alternative ports by name and
+explicitly names the ones to avoid (5000, 7000, 8080, 8888) so the
+reader doesn't have to guess.

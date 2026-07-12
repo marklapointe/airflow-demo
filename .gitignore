@@ -32,7 +32,10 @@ simple_auth_manager_passwords.json.generated
 .idea/dictionaries/
 .idea/shelf/
 .idea/dataSources/
-.vscode/
+# .vscode/ mostly ignored (auto-generated state). We commit launch.json
+# so VSCode users get the same run configs as PyCharm users.
+.vscode/*
+!.vscode/launch.json
 *.swp
 *.swo
 .DS_Store

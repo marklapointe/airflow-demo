@@ -201,7 +201,9 @@ python3 -m airflow dags trigger csv_to_warehouse
 python3 -m airflow standalone
 ```
 
-The webserver defaults to <http://localhost:8080>. On a fresh install, Airflow
+The webserver defaults to <http://localhost:8080>. 8080 is taken by lots of
+other services, so passing `--port 7161` (or another free port) is
+typical. On a fresh install, Airflow
 asks you to create the first admin user; follow the prompt.
 
 ## Web UI
@@ -221,12 +223,13 @@ once:
    "what does this DAG look like?" and "what did last Tuesday's run do?".
 
 ```bash
-# Default port is 5050 — 5000 is taken by macOS Control Center, 8080 is
-# taken by countless other apps. Pass any free port. The CLI will tell you
-# if your pick is busy; use --find-port to auto-pick a free one.
+# Solid ports chosen at design time and verified free on the dev system:
+#   7123 = our UI default
+#   7161 = recommended for airflow webserver
+# 5000 (macOS) and 8080 (taken everywhere) are NOT in our defaults. No
+# auto-discovery — if a port is busy the CLI exits with a clean error.
 python main.py ui                                       # static only
-python main.py ui --airflow-url http://127.0.0.1:8080  # + airflow proxy
-python main.py ui --port 8080 --find-port              # busy port → auto-pick
+python main.py ui --airflow-url http://127.0.0.1:7161  # + airflow proxy
 ```
 
 Routes:

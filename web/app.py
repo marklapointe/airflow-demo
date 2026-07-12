@@ -70,7 +70,7 @@ def create_app(
         repo_root: Project root (used for ``/source/...`` resolution).
         dags_dir: Directory to scan for DAGs (default: ``<repo_root>/dags``).
         airflow_webserver_url: If set, mount the ``/airflow/*`` reverse proxy
-            pointing at this URL (typically ``http://127.0.0.1:8080``).
+            pointing at this URL (typically ``http://127.0.0.1:7161``).
         proxy_timeout: Seconds to wait on the upstream before returning 502.
     """
     repo_root = Path(repo_root or DEFAULT_REPO_ROOT)
@@ -140,7 +140,7 @@ def _register_proxy(app: Flask, upstream: str, timeout: float) -> None:
     """Mount ``/airflow/`` proxy routes that forward to ``upstream``.
 
     The two routes (with and without trailing path) let us tolerate either
-    ``http://localhost:8080`` or ``http://localhost:8080/`` as the upstream
+    ``http://localhost:7161`` or ``http://localhost:7161/`` as the upstream
     URL without double-slashing.
     """
     base = _normalise_upstream_base(upstream)
@@ -208,4 +208,4 @@ def _proxy_request(base: str, upath: str, timeout: float) -> Response:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    create_app().run(debug=True, port=5050)
+    create_app().run(debug=True, port=7123)
