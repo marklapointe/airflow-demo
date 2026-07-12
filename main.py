@@ -248,11 +248,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_ui.add_argument(
-        "--find-port",
-        action="store_true",
-        help="if --port is busy, auto-pick the next free port instead of erroring",
-    )
-    p_ui.add_argument(
         "--airflow-url",
         default=None,
         help=(
